@@ -224,16 +224,6 @@ docker compose down -v
 | Container ไม่สมบูรณ์ | รัน `docker compose ps` และ `docker compose logs <service>` |
 | k6 "connection refused" | ตรวจว่า API ทำงานอยู่: `curl http://localhost:3000/health` |
 
-ดู [docs/WORKSHOP_GUIDE.md](docs/WORKSHOP_GUIDE.md) สำหรับคู่มือการแก้ไขปัญหาแบบละเอียด
-
----
-
-## 📚 เอกสารประกอบ
-
-- [docs/WORKSHOP_GUIDE.md](docs/WORKSHOP_GUIDE.md) — คู่มือ workshop ครบถ้วน, สถาปัตยกรรม, สคริปต์การสอน
-- [docs/LABS.md](docs/LABS.md) — Labs แบบ step-by-step
-- [CHEATSHEET.md](CHEATSHEET.md) — คำสั่งอ้างอิงฉบับย่อ
-
 ---
 
 ## 🙏 Tech Stack
