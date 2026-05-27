@@ -6,6 +6,7 @@ tempo-storage/
 
 # Markdown files
 *.md
+!README.md
 
 # Node.js
 node_modules/
