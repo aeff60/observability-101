@@ -1,0 +1,41 @@
+# ============================================================
+# Prometheus Configuration
+# ============================================================
+# Prometheus "pulls" (scrapes) metrics from targets at
+# regular intervals. Think of it like a polling system.
+#
+# Data flow:
+#   API (/metrics endpoint) ← Prometheus (scrapes every 5s) → Grafana
+# ============================================================
+
+global:
+  scrape_interval:     15s  # How often to collect metrics by default
+  evaluation_interval: 15s  # How often to evaluate alerting rules
+
+# Alerting configuration (not used in this workshop, but included for reference)
+alerting:
+  alertmanagers: []
+
+# Rules files (for alerts) — empty for this workshop
+rule_files: []
+
+# ============================================================
+# Scrape Configurations
+# ============================================================
+scrape_configs:
+
+  # Prometheus monitors itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Our Workshop API
+  # Prometheus will hit http://api:3000/metrics every 5 seconds
+  - job_name: 'workshop-api'
+    metrics_path: '/metrics'
+    scrape_interval: 5s         # Faster scrape for workshop visibility
+    static_configs:
+      - targets: ['api:3000']
+        labels:
+          service: 'workshop-api'
+          environment: 'workshop'

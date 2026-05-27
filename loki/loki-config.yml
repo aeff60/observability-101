@@ -1,0 +1,63 @@
+# ============================================================
+# Loki Configuration - Log Aggregation
+# ============================================================
+# Loki stores logs efficiently using labels (similar to
+# how Prometheus stores metrics). It does NOT index the
+# full log content — only the labels.
+#
+# Data flow:
+#   API (stdout) → Promtail → Loki → Grafana
+# ============================================================
+
+auth_enabled: false  # No authentication for workshop simplicity
+
+server:
+  http_listen_port: 3100
+  grpc_listen_port: 9096
+  log_level: warn
+
+common:
+  instance_addr: 127.0.0.1
+  path_prefix: /loki
+  storage:
+    filesystem:
+      chunks_directory: /loki/chunks
+      rules_directory:  /loki/rules
+  replication_factor: 1
+  ring:
+    kvstore:
+      store: inmemory  # Single-node, no distributed coordination needed
+
+# Cache for faster range queries
+query_range:
+  results_cache:
+    cache:
+      embedded_cache:
+        enabled: true
+        max_size_mb: 100
+
+# Schema: how log data is organized on disk
+schema_config:
+  configs:
+    - from: 2020-10-24
+      store: boltdb-shipper
+      object_store: filesystem
+      schema: v11
+      index:
+        prefix: index_
+        period: 24h  # Create a new index file every 24 hours
+
+# Alerting (not used in workshop)
+ruler:
+  alertmanager_url: http://localhost:9093
+
+# Retention: keep logs for 168 hours (7 days)
+limits_config:
+  retention_period: 168h
+  ingestion_rate_mb: 16
+  ingestion_burst_size_mb: 32
+
+compactor:
+  working_directory: /loki/compactor
+  shared_store: filesystem
+  retention_enabled: true

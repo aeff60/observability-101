@@ -1,0 +1,21 @@
+# ============================================================
+# Grafana Dashboard Provider - Auto-loads dashboards from files
+# ============================================================
+# Tells Grafana where to find dashboard JSON files.
+# Any .json file in /var/lib/grafana/dashboards will be
+# automatically loaded on startup.
+# ============================================================
+
+apiVersion: 1
+
+providers:
+  - name: 'Workshop Dashboards'
+    orgId: 1
+    folder: 'Workshop'
+    folderUid: 'workshop'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards

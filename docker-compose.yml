@@ -1,0 +1,193 @@
+version: '3.8'
+
+# ============================================================
+# Observability Workshop - Docker Compose
+# ============================================================
+# Services:
+#   - api        → Express.js demo API (port 3000)
+#   - prometheus → Metrics collection (port 9090)
+#   - grafana    → Visualization (port 3001)
+#   - loki       → Log aggregation (port 3100)
+#   - promtail   → Log collector (no port, internal)
+#   - k6         → Load testing (profile: load-test)
+# ============================================================
+
+networks:
+  observability:
+    driver: bridge
+
+volumes:
+  grafana-storage:
+  loki-storage:
+  prometheus-storage:
+  tempo-storage:
+
+services:
+
+  # ============================================================
+  # OpenTelemetry Collector - Central telemetry gateway
+  # ============================================================
+  # Receives traces from the API via OTLP, routes to Tempo.
+  # ============================================================
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.100.0
+    container_name: workshop-otel-collector
+    volumes:
+      - ./otel-collector/otel-collector-config.yml:/etc/otelcol-contrib/config.yaml:ro
+    ports:
+      - "4317:4317"   # OTLP gRPC
+      - "4318:4318"   # OTLP HTTP
+    networks:
+      - observability
+    restart: unless-stopped
+    depends_on:
+      - tempo
+
+  # ============================================================
+  # Tempo - Distributed Traces Backend
+  # ============================================================
+  # Stores traces sent by the OTel Collector.
+  # Grafana queries traces from Tempo on port 3200.
+  # ============================================================
+  tempo:
+    image: grafana/tempo:2.4.1
+    container_name: workshop-tempo
+    command: -config.file=/etc/tempo/tempo-config.yml
+    volumes:
+      - ./tempo/tempo-config.yml:/etc/tempo/tempo-config.yml:ro
+      - tempo-storage:/var/tempo
+    ports:
+      - "3200:3200"   # Tempo HTTP API (Grafana queries here)
+    networks:
+      - observability
+    restart: unless-stopped
+
+  # ============================================================
+  # Demo API - Express.js
+  # ============================================================
+  api:
+    build: ./api
+    container_name: workshop-api
+    ports:
+      - "3000:3000"
+    environment:
+      # OpenTelemetry configuration — auto-picked up by the OTel SDK
+      - OTEL_SERVICE_NAME=workshop-api
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - OTEL_TRACES_EXPORTER=otlp
+      - OTEL_PROPAGATORS=tracecontext,baggage
+    networks:
+      - observability
+    labels:
+      logging: "promtail"
+      job: "api"
+    restart: unless-stopped
+    depends_on:
+      - otel-collector
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # ============================================================
+  # Prometheus - Pulls metrics from the API every 5 seconds
+  # ============================================================
+  prometheus:
+    image: prom/prometheus:v2.52.0
+    container_name: workshop-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-storage:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=24h'
+      - '--web.enable-lifecycle'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+    networks:
+      - observability
+    restart: unless-stopped
+    depends_on:
+      - api
+
+  # ============================================================
+  # Grafana - Dashboard & Visualization UI
+  # ============================================================
+  grafana:
+    image: grafana/grafana:10.4.3
+    container_name: workshop-grafana
+    ports:
+      - "3001:3000"
+    volumes:
+      - grafana-storage:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
+      - GF_FEATURE_TOGGLES_ENABLE=newVizTooltips
+    networks:
+      - observability
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+      - loki
+      - tempo
+
+  # ============================================================
+  # Loki - Log Aggregation Backend
+  # ============================================================
+  loki:
+    image: grafana/loki:2.9.8
+    container_name: workshop-loki
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./loki/loki-config.yml:/etc/loki/local-config.yaml:ro
+      - loki-storage:/loki
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - observability
+    restart: unless-stopped
+
+  # ============================================================
+  # Promtail - Collects container logs and ships to Loki
+  # ============================================================
+  promtail:
+    image: grafana/promtail:3.3.2
+    container_name: workshop-promtail
+    volumes:
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./promtail/promtail-config.yml:/etc/promtail/config.yml:ro
+    command: -config.file=/etc/promtail/config.yml
+    networks:
+      - observability
+    restart: unless-stopped
+    depends_on:
+      - loki
+
+  # ============================================================
+  # k6 - Load Testing (run manually, not started by default)
+  # Usage: docker compose run --rm k6 run /scripts/load.js
+  # ============================================================
+  k6:
+    image: grafana/k6:0.51.0
+    container_name: workshop-k6
+    volumes:
+      - ./k6:/scripts
+    environment:
+      - BASE_URL=http://api:3000
+    networks:
+      - observability
+    profiles:
+      - load-test
+    depends_on:
+      - api

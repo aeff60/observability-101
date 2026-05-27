@@ -1,0 +1,24 @@
+# Docker volumes / runtime data
+loki-storage/
+prometheus-storage/
+grafana-storage/
+tempo-storage/
+
+# Markdown files
+*.md
+
+# Node.js
+node_modules/
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# Promtail position tracking
+promtail/positions.yaml

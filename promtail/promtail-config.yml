@@ -1,0 +1,60 @@
+# ============================================================
+# Promtail Configuration - Log Collector
+# ============================================================
+# Promtail is like a "log shipper". It:
+#   1. Watches Docker containers for new log lines
+#   2. Attaches labels (container name, job, service)
+#   3. Sends log lines to Loki
+#
+# Data flow:
+#   Docker container logs → Promtail → Loki → Grafana
+# ============================================================
+
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+# Tracks the last-read position in each log file
+# Prevents re-reading logs after container restart
+positions:
+  filename: /tmp/positions.yaml
+
+# Where to send logs
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+
+  # ============================================================
+  # Docker Service Discovery
+  # Automatically finds containers with label: logging=promtail
+  # ============================================================
+  - job_name: docker
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+        filters:
+          - name: label
+            values: ["logging=promtail"]  # Only collect from labeled containers
+
+    # Relabeling: transform Docker metadata into Loki labels
+    relabel_configs:
+
+      # Extract container name → label "container"
+      # Docker names containers as "/workshop-api", strip the leading slash
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/(.*)'
+        target_label: 'container'
+
+      # Use the Docker label "job" → label "job"
+      # This allows querying: {job="api"} in Grafana
+      - source_labels: ['__meta_docker_container_label_job']
+        target_label: 'job'
+
+      # Log stream: stdout or stderr
+      - source_labels: ['__meta_docker_container_log_stream']
+        target_label: 'logstream'
+
+      # Include compose service name
+      - source_labels: ['__meta_docker_container_label_com_docker_compose_service']
+        target_label: 'compose_service'

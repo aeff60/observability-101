@@ -1,0 +1,60 @@
+# ============================================================
+# Grafana Data Sources - Auto-provisioned on startup
+# ============================================================
+# Grafana will automatically connect to Prometheus and Loki
+# when it starts. No manual configuration needed!
+# ============================================================
+
+apiVersion: 1
+
+datasources:
+
+  # Prometheus - for METRICS (numbers over time)
+  - name: Prometheus
+    type: prometheus
+    uid: workshop-prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false
+    jsonData:
+      httpMethod: POST
+      prometheusType: Prometheus
+      prometheusVersion: 2.52.0
+      timeInterval: "5s"
+
+  # Loki - for LOGS (text events)
+  - name: Loki
+    type: loki
+    uid: workshop-loki
+    access: proxy
+    url: http://loki:3100
+    isDefault: false
+    editable: false
+    jsonData:
+      maxLines: 1000
+
+  # Tempo - for TRACES (request journey across services)
+  - name: Tempo
+    type: tempo
+    uid: workshop-tempo
+    access: proxy
+    url: http://tempo:3200
+    isDefault: false
+    editable: false
+    jsonData:
+      # Link traces → logs in Loki
+      tracesToLogsV2:
+        datasourceUid: workshop-loki
+        filterByTraceID: true
+        filterBySpanID: false
+        customQuery: false
+      # Link traces → metrics in Prometheus
+      tracesToMetrics:
+        datasourceUid: workshop-prometheus
+        queries:
+          - name: 'Request Rate'
+            query: 'rate(http_requests_total{$__tags}[5m])'
+      # Enable node graph view for service topology
+      nodeGraph:
+        enabled: true

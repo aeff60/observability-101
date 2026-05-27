@@ -1,0 +1,50 @@
+# ============================================================
+# OpenTelemetry Collector Configuration
+# ============================================================
+# Acts as the central gateway for all telemetry data.
+# The API sends traces here via OTLP, then this collector
+# routes them to the appropriate backend (Tempo).
+#
+# Flow:
+#   API (OTLP gRPC :4317) → OTel Collector → Tempo
+# ============================================================
+
+receivers:
+  # OTLP receiver — accepts telemetry from the API
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317   # gRPC (preferred)
+      http:
+        endpoint: 0.0.0.0:4318   # HTTP/protobuf (alternative)
+
+processors:
+  # Batch spans before sending to reduce network overhead
+  batch:
+    timeout: 1s
+    send_batch_size: 1024
+
+  # Add resource attributes to all telemetry
+  resource:
+    attributes:
+      - key: deployment.environment
+        value: workshop
+        action: upsert
+
+exporters:
+  # Forward traces to Tempo via OTLP gRPC
+  otlp/tempo:
+    endpoint: tempo:4317
+    tls:
+      insecure: true
+
+  # Optional: print spans to collector logs (useful for debugging)
+  debug:
+    verbosity: basic
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch, resource]
+      exporters: [otlp/tempo]

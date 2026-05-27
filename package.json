@@ -1,0 +1,19 @@
+{
+  "name": "observability",
+  "version": "1.0.0",
+  "description": "> **ระดับ:** Beginner → Junior  \r > **เวลา:** 60 นาที  \r > **สิ่งที่ต้องมีก่อน:** ติดตั้ง Docker Desktop, มีความรู้พื้นฐานเรื่อง REST API",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "slides": "npx slidev slides.md",
+    "slides:build": "npx slidev build slides.md",
+    "slides:export": "npx slidev export slides.md",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs"
+}
